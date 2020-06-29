@@ -20,6 +20,7 @@ def geodesic_distance(lat1, lat2, lon1, lon2):
     b = 6356752.3142
     f = 1 / 298.257223563
     eps = 1e-5
+    precision = 1e-9
 
     lon_delta = np.abs(lon1 - lon2)
     u1 = np.arctan((1 - f) * np.tan(lat1))
@@ -27,7 +28,7 @@ def geodesic_distance(lat1, lat2, lon1, lon2):
     lam = lon_delta
     lam_hat = 2 * np.pi
 
-    while np.abs(lam - lam_hat) > 1e-9:
+    while np.abs(lam - lam_hat) > precision:
         sin_lam = np.sin(lam)
         cos_lam = np.cos(lam)
         sin_u1 = np.sin(u1)

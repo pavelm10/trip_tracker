@@ -20,6 +20,7 @@ class GpxTripTracker(ElasticAPI):
                  ('time_delta_s', 'f8'), ('total_time_h', 'f8'), ('elev_up_cum_m', 'f8'), ('elev_down_cum_m', 'f8')
                  ]
     MODES = ['bike', 'run', 'walk']
+    SLOW_MODES = ['walk']
     STOP_DIST_FAST_MAX_M = 40
     STOP_DIST_SLOW_MAX_M = 24
     MIN_SEPARATION_CORRECTION_DIST_M = 30
@@ -291,7 +292,7 @@ class GpxTripTracker(ElasticAPI):
         """detects stop in point samples"""
         time_threshold = median_time_delta * 4
         dist_threshold = self.STOP_DIST_SLOW_MAX_M
-        if self.transport_mode != 'walk':
+        if self.transport_mode not in self.SLOW_MODES:
             dist_threshold = self.STOP_DIST_FAST_MAX_M
 
         return time_delta > time_threshold and dist < dist_threshold
@@ -316,10 +317,10 @@ if __name__ == "__main__":
                       help='elasticsearch index to be used for data storage, if None, no indexing will happen',
                       default=None)
     argp.add_argument('--start',
-                      help='Isoformat time of a trip start, set for untracked trips, None for tracked or planned trips',
+                      help='Isoformat time of a trip start, set it for untracked trips, None for tracked or planned trips',
                       default=None)
     argp.add_argument('--end',
-                      help='Isoformat time of a trip end, set for untracked trips, None for tracked or planned trips',
+                      help='Isoformat time of a trip end, set it for untracked trips, None for tracked or planned trips',
                       default=None)
 
     params = argp.parse_args()
