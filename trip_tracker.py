@@ -108,7 +108,7 @@ class GpxTripTracker(ElasticAPI):
             else:
                 self.push(global_message)
                 self.log.info('Ingesting trip points...')
-                self.bulk_push(self.ingest_iterator(track_points, odometry, trip_type))
+                self.bulk_push(self.ingest_generator(track_points, odometry, trip_type))
         else:
             self.log.warning('The index is None, hence no ingest to ES')
 
@@ -133,7 +133,7 @@ class GpxTripTracker(ElasticAPI):
                 "transport_mode": self.transport_mode}
         return data
 
-    def ingest_iterator(self, track_points, odometry, trip_type):
+    def ingest_generator(self, track_points, odometry, trip_type):
         for idx, (pt, odo_sample) in enumerate(zip(track_points, odometry)):
             data = self._ingest_geo_point(pt, odo_sample, trip_type, idx + 1)
             yield data

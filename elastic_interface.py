@@ -17,12 +17,12 @@ class ElasticAPI:
         res = self.es.index(index=self.es_index, id=uuid.uuid1(), body=data_dict, request_timeout=10)
         return res["_shards"]["successful"] == 1
 
-    def bulk_push(self, iterator):
-        return elasticsearch.helpers.bulk(self.es, actions=self.process_iterator(iterator))
+    def bulk_push(self, generator):
+        return elasticsearch.helpers.bulk(self.es, actions=self.process_generator(generator))
 
-    def process_iterator(self, iterator):
+    def process_generator(self, generator):
         ts = datetime.datetime.utcnow()
-        for data_dict in iterator:
+        for data_dict in generator:
             data_dict.update({'timestamp': ts, '_id': uuid.uuid1(), '_index': self.es_index})
             yield data_dict
 
