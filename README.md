@@ -7,10 +7,11 @@ to the `Elasticsearch` index.
 with using a reference `GPX file` that would fill the gaps.
 - Also `untracked` trips can be ingested if the `start` datetime and `end`
 datetime are known.
-- The script can be run without ingesting the data to the Elasticsearch index, 
+- The script can be run without ingesting the data to the `Elasticsearch` index, 
 which would then only provide aggregated information of the trip.
-- If the data are ingested to the Elasticsearch index then the trip trajectory
-can be visualized in the Kibana maps visualization.
+- If the data are ingested to the `Elasticsearch` index then the trip trajectory
+can be visualized in the `Kibana` maps visualization.
+- Automatic detection of inactivity, i.e. no movement
 
 ## Trip types definitions:
 - `driven` - trip type of a trip that was tracked by an application that provides the `GPX
