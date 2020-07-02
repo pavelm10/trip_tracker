@@ -1,5 +1,6 @@
 import datetime
 import numpy as np
+import uuid
 import gpxpy
 
 from utils import str2path, simple_logger, interpolate_timestamps
@@ -21,8 +22,8 @@ class GpxTripTracker(ElasticAPI):
                  ]
     MODES = ['bike', 'run', 'walk']
     SLOW_MODES = ['walk']
-    STOP_DIST_FAST_MAX_M = 40
-    STOP_DIST_SLOW_MAX_M = 24
+    STOP_VEL_FAST_MAX_MS = 1.4
+    STOP_VEL_SLOW_MAX_MS = 0.7
     MIN_SEPARATION_CORRECTION_DIST_M = 30
 
     def __init__(self, transport_mode=None, track_file_path=None, ref_file_path=None, start=None, end=None,
@@ -75,6 +76,7 @@ class GpxTripTracker(ElasticAPI):
 
         trip_length_km = odometry['cum_dist_km'][-1]
         trip_duration_h = odometry['total_time_h'][-1]
+        trip_total_duration_h = (trip_end_utc - trip_start_utc).total_seconds() * SEC2H
         trip_avg_vel_kph = trip_length_km / trip_duration_h if trip_duration_h > 0 else 0
         trip_max_elev_m = np.max(track_points['ele'])
         trip_min_elev_m = np.min(track_points['ele'])
@@ -85,6 +87,7 @@ class GpxTripTracker(ElasticAPI):
                           "trip_source_gpx": self.track_file_path.as_posix(),
                           "trip_start_utc": trip_start_utc,
                           "trip_end_utc": trip_end_utc,
+                          "trip_total_duration_h": trip_total_duration_h,
                           "trip_duration_h": trip_duration_h,
                           "trip_length_km": trip_length_km,
                           "trip_avg_vel_kph": trip_avg_vel_kph,
@@ -105,9 +108,7 @@ class GpxTripTracker(ElasticAPI):
             else:
                 self.push(global_message)
                 self.log.info('Ingesting trip points...')
-                for idx, (pt, odo_sample) in enumerate(zip(track_points, odometry)):
-                    data = self._ingest_geo_point(pt, odo_sample, trip_type, idx+1)
-                    self.push(data)
+                self.bulk_push(self.ingest_iterator(track_points, odometry, trip_type))
         else:
             self.log.warning('The index is None, hence no ingest to ES')
 
@@ -132,6 +133,11 @@ class GpxTripTracker(ElasticAPI):
                 "transport_mode": self.transport_mode}
         return data
 
+    def ingest_iterator(self, track_points, odometry, trip_type):
+        for idx, (pt, odo_sample) in enumerate(zip(track_points, odometry)):
+            data = self._ingest_geo_point(pt, odo_sample, trip_type, idx + 1)
+            yield data
+
     def extract_odometry(self, track_points):
         """Odometry extraction"""
         odo = np.zeros((len(track_points)), dtype=self.ODO_DTYPE)
@@ -140,14 +146,16 @@ class GpxTripTracker(ElasticAPI):
             elev_up_cum = 0
             elev_down_cum = 0
             med_time_delta = np.median(np.diff(track_points['timestamp'])).total_seconds()
+            time_threshold = med_time_delta * 4
 
             for idx, pt in enumerate(track_points):
                 try:
                     next_pt = track_points[idx+1]
                     dist = calculate_distance(pt, next_pt)
                     dt = (next_pt['timestamp'] - pt['timestamp']).total_seconds()
-                    if self._check_stop(dt, dist, med_time_delta):
-                        dt = med_time_delta
+                    if dt > time_threshold:
+                        if self._check_stop(dt, dist):
+                            dt = med_time_delta
                     elev_delta = next_pt['ele'] - pt['ele'] if (next_pt['ele'] != 0 or pt['ele'] != 0) else 0
                     if elev_delta > 0:
                         elev_up_cum += elev_delta
@@ -288,14 +296,14 @@ class GpxTripTracker(ElasticAPI):
             self.log.error(f"{transport_mode} is unknown mean of transport, known are: {self.MODES}")
             raise ValueError(f"{transport_mode} is unknown mean of transport")
 
-    def _check_stop(self, time_delta, dist, median_time_delta):
+    def _check_stop(self, time_delta, dist):
         """detects stop in point samples"""
-        time_threshold = median_time_delta * 4
-        dist_threshold = self.STOP_DIST_SLOW_MAX_M
+        velo_threshold_ms = self.STOP_VEL_SLOW_MAX_MS
         if self.transport_mode not in self.SLOW_MODES:
-            dist_threshold = self.STOP_DIST_FAST_MAX_M
+            velo_threshold_ms = self.STOP_VEL_FAST_MAX_MS
+        velo_ms = dist / time_delta
 
-        return time_delta > time_threshold and dist < dist_threshold
+        return velo_ms < velo_threshold_ms
 
 
 if __name__ == "__main__":
@@ -317,10 +325,12 @@ if __name__ == "__main__":
                       help='elasticsearch index to be used for data storage, if None, no indexing will happen',
                       default=None)
     argp.add_argument('--start',
-                      help='Isoformat time of a trip start, set it for untracked trips, None for tracked or planned trips',
+                      help='Isoformat time of a trip start,'
+                           ' set it for untracked trips, None for tracked or planned trips',
                       default=None)
     argp.add_argument('--end',
-                      help='Isoformat time of a trip end, set it for untracked trips, None for tracked or planned trips',
+                      help='Isoformat time of a trip end, '
+                           'set it for untracked trips, None for tracked or planned trips',
                       default=None)
 
     params = argp.parse_args()
