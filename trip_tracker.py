@@ -1,6 +1,5 @@
 import datetime
 import numpy as np
-import uuid
 import gpxpy
 
 from utils import str2path, simple_logger, interpolate_timestamps
@@ -18,12 +17,11 @@ class GpxTripTracker(ElasticAPI):
 
     GPS_DTYPE = [('lat', 'f8'), ('lon', 'f8'), ('ele', 'f8'), ('timestamp', 'O'), ('sid', 'i4'), ('pt_type', 'U16')]
     ODO_DTYPE = [('cum_dist_km', 'f8'), ('dist_m', 'f8'), ('avg_vel_kmh', 'f8'), ('elev_delta_m', 'f8'),
-                 ('time_delta_s', 'f8'), ('total_time_h', 'f8'), ('elev_up_cum_m', 'f8'), ('elev_down_cum_m', 'f8')
-                 ]
+                 ('time_delta_s', 'f8'), ('total_time_h', 'f8'), ('elev_up_cum_m', 'f8'), ('elev_down_cum_m', 'f8')]
     MODES = ['bike', 'run', 'walk']
     SLOW_MODES = ['walk']
-    STOP_VEL_FAST_MAX_MS = 1.4
-    STOP_VEL_SLOW_MAX_MS = 0.7
+    STOP_VEL_FAST_MPS = 1.4
+    STOP_VEL_SLOW_MPS = 0.7
     MIN_SEPARATION_CORRECTION_DIST_M = 30
 
     def __init__(self, transport_mode=None, track_file_path=None, ref_file_path=None, start=None, end=None,
@@ -298,9 +296,9 @@ class GpxTripTracker(ElasticAPI):
 
     def _check_stop(self, time_delta, dist):
         """detects stop in point samples"""
-        velo_threshold_ms = self.STOP_VEL_SLOW_MAX_MS
+        velo_threshold_ms = self.STOP_VEL_SLOW_MPS
         if self.transport_mode not in self.SLOW_MODES:
-            velo_threshold_ms = self.STOP_VEL_FAST_MAX_MS
+            velo_threshold_ms = self.STOP_VEL_FAST_MPS
         velo_ms = dist / time_delta
 
         return velo_ms < velo_threshold_ms
